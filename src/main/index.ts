@@ -1,10 +1,11 @@
-import { app } from 'electron';
+import { app, type BrowserWindow } from 'electron';
 import path from 'node:path';
 import {
   createCorrelationId,
   initializeLocalDiagnostics,
   writeLocalDiagnostic,
 } from './local-diagnostics';
+import { createEnsureMainWindow } from './window-lifecycle';
 type DatabaseApi = typeof import('./db');
 type WindowApi = typeof import('./window');
 
@@ -29,8 +30,25 @@ writeLocalDiagnostic({
 
 let databaseApi: DatabaseApi | undefined;
 let windowApi: WindowApi | undefined;
+let databaseInitialization: Promise<boolean> | undefined;
+let ensureMainWindow: (() => Promise<BrowserWindow | undefined>) | undefined;
 let cleanupAttempted = false;
 let cleanupFailed = false;
+
+function reportWindowCreationFailure(): void {
+  writeLocalDiagnostic({
+    level: 'error', event: 'startup.failed', correlationId: createCorrelationId(),
+    err: { code: 'WINDOW_CREATION_FAILED' },
+    metadata: { stage: 'window.create', outcome: 'failure' },
+  });
+  app.exit(1);
+}
+
+function focusWindow(window: BrowserWindow | undefined): void {
+  if (!window || window.isDestroyed()) return;
+  if (window.isMinimized()) window.restore();
+  window.focus();
+}
 
 function cleanup(): void {
   if (cleanupAttempted) return;
@@ -57,6 +75,14 @@ async function startApplication(): Promise<void> {
   // Delay importing startup modules until diagnostics can record their failures.
   const [ipcApi, loadedWindowApi] = await Promise.all([import('./ipc'), import('./window')]);
   windowApi = loadedWindowApi;
+  ensureMainWindow = createEnsureMainWindow({
+    waitForDatabase: () => databaseInitialization ?? Promise.resolve(false),
+    getMainWindow: () => windowApi?.getMainWindow(),
+    createMainWindow: () => {
+      if (!windowApi) throw new Error('Window module is not initialized');
+      return windowApi.createMainWindow();
+    },
+  });
   const lockCorrelationId = createCorrelationId();
   const hasSingleInstanceLock = app.requestSingleInstanceLock();
   writeLocalDiagnostic({
@@ -71,13 +97,10 @@ async function startApplication(): Promise<void> {
   }
 
   app.on('second-instance', () => {
-    const window = windowApi?.getMainWindow();
-    if (!window || window.isDestroyed()) return;
-    if (window.isMinimized()) window.restore();
-    window.focus();
+    void ensureMainWindow?.().then(focusWindow).catch(reportWindowCreationFailure);
   });
 
-  app.whenReady().then(async () => {
+  databaseInitialization = app.whenReady().then(async () => {
     writeLocalDiagnostic({
       level: 'info', event: 'startup.stage', correlationId: startupCorrelationId,
       metadata: { stage: 'app.ready', outcome: 'success' },
@@ -98,7 +121,7 @@ async function startApplication(): Promise<void> {
         metadata: { stage: 'database.initialize', outcome: 'failure' },
       });
       app.exit(1);
-      return;
+      return false;
     }
     const result = databaseApi.openDatabase();
     if (result.isErr()) {
@@ -108,23 +131,14 @@ async function startApplication(): Promise<void> {
         metadata: { stage: 'database.initialize', outcome: 'failure' },
       });
       app.exit(1);
-      return;
+      return false;
     }
     writeLocalDiagnostic({
       level: 'info', event: 'database.initialize', correlationId: databaseCorrelationId,
       metadata: { stage: 'database.initialize', outcome: 'success' },
     });
     ipcApi.registerIpc(databaseApi);
-    try {
-      windowApi?.createMainWindow();
-    } catch {
-      writeLocalDiagnostic({
-        level: 'error', event: 'startup.failed', correlationId: createCorrelationId(),
-        err: { code: 'WINDOW_CREATION_FAILED' },
-        metadata: { stage: 'window.create', outcome: 'failure' },
-      });
-      app.exit(1);
-    }
+    return true;
   }).catch(() => {
     writeLocalDiagnostic({
       level: 'error', event: 'startup.failed', correlationId: startupCorrelationId,
@@ -132,14 +146,17 @@ async function startApplication(): Promise<void> {
       metadata: { stage: 'app.ready', outcome: 'failure' },
     });
     app.exit(1);
+    return false;
   });
 
   app.on('activate', () => {
-    if (windowApi?.getMainWindow()?.isDestroyed() !== false) windowApi?.createMainWindow();
+    void ensureMainWindow?.().then(focusWindow).catch(reportWindowCreationFailure);
   });
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit();
   });
+
+  void ensureMainWindow().catch(reportWindowCreationFailure);
 }
 
 void startApplication().catch(() => {
