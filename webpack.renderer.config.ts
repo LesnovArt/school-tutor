@@ -1,11 +1,32 @@
 import { Compilation, sources, type Configuration } from 'webpack';
+import path from 'node:path';
 
 const config: Configuration = {
   // Forge defaults to eval-source-map in development, which strict script-src CSP blocks.
   devtool: 'source-map',
   module: {
     rules: [
-      { test: /\.tsx?$/, include: /src/, use: 'ts-loader' },
+      {
+        test: /\.tsx?$/,
+        include: path.resolve(__dirname, 'src/renderer'),
+        use: {
+          loader: 'babel-loader',
+          options: {
+            // React Compiler must see the original JSX before preset-react transforms it.
+            plugins: ['babel-plugin-react-compiler'],
+            presets: [
+              '@babel/preset-typescript',
+              ['@babel/preset-react', { runtime: 'automatic' }],
+            ],
+          },
+        },
+      },
+      {
+        test: /\.tsx?$/,
+        include: /src/,
+        exclude: path.resolve(__dirname, 'src/renderer'),
+        use: 'ts-loader',
+      },
       { test: /\.css$/, use: ['style-loader', 'css-loader'] },
     ],
   },
