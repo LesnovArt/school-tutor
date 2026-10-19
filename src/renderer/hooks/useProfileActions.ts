@@ -1,5 +1,6 @@
 import { useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { CreateProfileInput, Profile } from '../../contracts/profile';
+import { settingsApi } from '../api/settings';
 import type { AppErrorKey } from './useAppStartup';
 
 export type ProfileMutation = 'idle' | 'selecting' | 'creating';
@@ -30,7 +31,7 @@ export function useProfileActions(options: {
   async function selectProfile(profileId: string): Promise<void> {
     if (!beginMutation('selecting')) return;
     try {
-      const result = await window.schoolTutor.settings.setActiveProfile(profileId);
+      const result = await settingsApi.setActiveProfile(profileId);
       if (result.ok) {
         setSelectedId(result.value);
         setErrorKey(null);
@@ -55,7 +56,7 @@ export function useProfileActions(options: {
       }
       profileCreated = true;
       setProfiles((current) => [...current, result.value]);
-      const selectedResult = await window.schoolTutor.settings.setActiveProfile(result.value.id);
+      const selectedResult = await settingsApi.setActiveProfile(result.value.id);
       if (!selectedResult.ok) {
         setErrorKey('selectionError');
         return 'created';

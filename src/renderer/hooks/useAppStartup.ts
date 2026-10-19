@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Profile, UiLanguage } from '../../contracts/profile';
+import { settingsApi } from '../api/settings';
 import { resolveSelectedProfileId } from './profile-selection';
 import { reportRendererReady, reportRendererStartupFailure, isSchoolTutorBridgeAvailable } from '../diagnostics/startup-diagnostics';
 
@@ -41,8 +42,8 @@ export function useAppStartup() {
 
     void Promise.all([
       window.schoolTutor.profiles.list(),
-      window.schoolTutor.settings.getLanguage(),
-      window.schoolTutor.settings.getActiveProfile(),
+      settingsApi.getLanguage(),
+      settingsApi.getActiveProfile(),
     ]).then(([profileResult, languageResult, activeResult]) => {
       if (cancelled) return;
       if (!profileResult.ok || !languageResult.ok || !activeResult.ok) {

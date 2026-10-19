@@ -1,5 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react';
 import type { UiLanguage } from '../../contracts/profile';
+import { settingsApi } from '../api/settings';
 import type { AppErrorKey } from './useAppStartup';
 
 export function useLanguageSettings(options: {
@@ -8,7 +9,7 @@ export function useLanguageSettings(options: {
 }) {
   async function changeLanguage(next: UiLanguage): Promise<void> {
     try {
-      const result = await window.schoolTutor.settings.setLanguage(next);
+      const result = await settingsApi.setLanguage(next);
       if (result.ok) {
         options.setLanguage(result.value);
         options.setErrorKey(null);
