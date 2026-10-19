@@ -3,12 +3,12 @@ import { z } from 'zod';
 export const uiLanguageSchema = z.enum(['uk', 'bg', 'en']);
 export const ageBandSchema = z.enum(['6-8', '9-11', '12-14', '15+']);
 export const profileSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
   displayName: z.string().min(1).max(40),
   ageBand: ageBandSchema,
   preferredLanguage: uiLanguageSchema,
   learningPreferences: z.string().max(240),
-  createdAt: z.string().datetime(),
+  createdAt: z.iso.datetime(),
 });
 export const createProfileInputSchema = z.object({
   displayName: z.string().trim().min(1).max(40),
