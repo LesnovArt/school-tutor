@@ -5,6 +5,7 @@ import {
   createCorrelationId,
   writeLocalDiagnostic,
 } from './local-diagnostics';
+import { createParentAuth } from './parent-auth';
 import {
   getMainWindow,
   recordRendererReady,
@@ -30,9 +31,10 @@ function toApiResult<T>(result: Result<T, ApiError>): ApiResult<T> {
   return { ok: true, value: result.value };
 }
 
-function register<T>(channel: string, operation: (input: unknown) => T): void {
+function register<T>(channel: string, operation: (input: unknown) => T, authorize: () => boolean = () => true): void {
   ipcMain.handle(channel, async (event, input) => {
     if (!isTrustedMainFrame(event)) return { ok: false, error: { code: 'UnauthorizedAction', message: 'This request is not allowed.' } };
+    if (!authorize()) return { ok: false, error: { code: 'UnauthorizedAction', message: 'Unlock parent settings first.' } };
     try {
       return await operation(input);
     } catch {
@@ -47,8 +49,19 @@ function register<T>(channel: string, operation: (input: unknown) => T): void {
 }
 
 export function registerIpc(database: DatabaseApi): void {
+  const parent = createParentAuth({ getDatabase: () => database.getDatabase() });
+  // Administrative mutations are authorized here, in the main process; the renderer cannot skip the check.
+  const registerParent = <T>(channel: string, operation: (input: unknown) => T) => register(channel, operation, parent.authorize);
+
+  register('parent:status', () => toApiResult(parent.getStatus()));
+  register('parent:setup-pin', (input) => toApiResult(parent.setupPin(input)));
+  register('parent:unlock', (input) => toApiResult(parent.unlock(input)));
+  register('parent:lock', () => toApiResult(parent.lock()));
+
   register('profiles:list', () => toApiResult(database.listProfiles()));
-  register('profiles:create', (input) => toApiResult(database.createProfile(input)));
+  registerParent('profiles:create', (input) => toApiResult(database.createProfile(input)));
+  registerParent('profiles:set-explanation-language', (input) => toApiResult(database.setExplanationLanguage(input)));
+
   register('settings:get-language', () => toApiResult(database.getUiLanguage()));
   register('settings:get-active-profile', () => toApiResult(database.getActiveProfileId()));
   register('settings:set-active-profile', (input) => toApiResult(database.setActiveProfileId(input)));

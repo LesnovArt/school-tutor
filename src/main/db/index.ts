@@ -4,7 +4,10 @@ import path from 'node:path';
 import { err, ok, type Result } from 'neverthrow';
 import { randomUUID } from 'node:crypto';
 import type { ApiError } from '../../contracts/api';
-import { createProfileInputSchema, type CreateProfileInput, type Profile, profileSchema, uiLanguageSchema } from '../../contracts/profile';
+import {
+  createProfileInputSchema, updateExplanationLanguageInputSchema,
+  type CreateProfileInput, type Profile, profileSchema, uiLanguageSchema,
+} from '../../contracts/profile';
 import { z } from 'zod';
 import { runMigrations } from './migrations';
 
@@ -33,6 +36,10 @@ function requireDatabase(): Database.Database {
   return database;
 }
 
+export function getDatabase(): Database.Database {
+  return requireDatabase();
+}
+
 export function listProfiles(): Result<Profile[], ApiError> {
   try {
     const rows = requireDatabase().prepare(`SELECT id, display_name AS displayName, age_band AS ageBand,
@@ -51,6 +58,22 @@ export function createProfile(input: unknown): Result<Profile, ApiError> {
     const count = (requireDatabase().prepare('SELECT COUNT(*) AS count FROM profiles').get() as { count: number }).count;
     if (count >= 2) return err({ code: 'InvalidInput', message: 'This installation supports two child profiles.' });
     return ok(insertProfile(parsed.data));
+  } catch {
+    return err({ code: 'PersistenceFailure', message: 'Could not save this profile.' });
+  }
+}
+
+export function setExplanationLanguage(input: unknown): Result<Profile, ApiError> {
+  const parsed = updateExplanationLanguageInputSchema.safeParse(input);
+  if (!parsed.success) return err({ code: 'InvalidInput', message: 'Choose a profile and a supported language.' });
+  try {
+    const updated = requireDatabase().prepare('UPDATE profiles SET preferred_language = ? WHERE id = ?')
+      .run(parsed.data.preferredLanguage, parsed.data.profileId);
+    if (updated.changes === 0) return err({ code: 'InvalidInput', message: 'Choose an existing profile.' });
+    return listProfiles().andThen((profiles): Result<Profile, ApiError> => {
+      const profile = profiles.find((candidate) => candidate.id === parsed.data.profileId);
+      return profile ? ok(profile) : err({ code: 'PersistenceFailure', message: 'Could not load profiles.' });
+    });
   } catch {
     return err({ code: 'PersistenceFailure', message: 'Could not save this profile.' });
   }

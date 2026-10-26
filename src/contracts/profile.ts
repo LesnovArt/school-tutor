@@ -16,6 +16,11 @@ export const createProfileInputSchema = z.object({
   preferredLanguage: uiLanguageSchema,
   learningPreferences: z.string().trim().max(240).default(''),
 });
+export const updateExplanationLanguageInputSchema = z.object({
+  profileId: z.uuid(),
+  preferredLanguage: uiLanguageSchema,
+});
 export type UiLanguage = z.infer<typeof uiLanguageSchema>;
 export type Profile = z.infer<typeof profileSchema>;
 export type CreateProfileInput = z.infer<typeof createProfileInputSchema>;
+export type UpdateExplanationLanguageInput = z.infer<typeof updateExplanationLanguageInputSchema>;

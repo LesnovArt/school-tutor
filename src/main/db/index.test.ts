@@ -6,7 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const { mockGetPath } = vi.hoisted(() => ({ mockGetPath: vi.fn() }));
 vi.mock('electron', () => ({ app: { getPath: mockGetPath } }));
 
-import { closeDatabase, createProfile, getActiveProfileId, listProfiles, openDatabase, setActiveProfileId } from './index';
+import {
+  closeDatabase, createProfile, getActiveProfileId, listProfiles, openDatabase, setActiveProfileId,
+  setExplanationLanguage, setUiLanguage,
+} from './index';
 
 let dataPath = '';
 
@@ -45,3 +48,20 @@ describe('local profile persistence', () => {
     expect(createProfile({ displayName: 'C', ageBand: '12-14', preferredLanguage: 'en' }).isErr()).toBe(true);
   });
 });
+
+describe('language roles', () => {
+  const mila = { displayName: 'Mila', ageBand: '6-8', preferredLanguage: 'uk', learningPreferences: '' };
+
+  it('sets the explanation language per child, independent of interface and homework languages', () => {
+    expect(openDatabase().isOk()).toBe(true);
+    const first = createProfile(mila)._unsafeUnwrap();
+    const second = createProfile({ ...mila, displayName: 'Ivan' })._unsafeUnwrap();
+    setUiLanguage('en')._unsafeUnwrap();
+
+    expect(setExplanationLanguage({ profileId: first.id, preferredLanguage: 'bg' })._unsafeUnwrap().preferredLanguage).toBe('bg');
+    expect(listProfiles()._unsafeUnwrap().map((profile) => profile.preferredLanguage)).toEqual(['bg', 'uk']);
+    expect(setExplanationLanguage({ profileId: second.id, preferredLanguage: 'fr' })._unsafeUnwrapErr().code).toBe('InvalidInput');
+    expect(setExplanationLanguage({ profileId: '33333333-3333-4333-8333-333333333333', preferredLanguage: 'en' })._unsafeUnwrapErr().code).toBe('InvalidInput');
+  });
+});
+
