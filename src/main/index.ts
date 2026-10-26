@@ -5,12 +5,16 @@ import {
   initializeLocalDiagnostics,
   writeLocalDiagnostic,
 } from './local-diagnostics';
+import { handleSquirrelStartup } from './squirrel-startup';
 import { createEnsureMainWindow } from './window-lifecycle';
 type DatabaseApi = typeof import('./db');
 type WindowApi = typeof import('./window');
 
+// Squirrel.Windows launches the app during install/update/uninstall; only manage shortcuts then.
+const servingInstaller = handleSquirrelStartup(process.platform, process.argv, process.execPath, () => app.quit());
+
 // Initialize local diagnostics before importing database or startup modules.
-try {
+if (!servingInstaller) try {
   initializeLocalDiagnostics({
     logDirectory: path.join(app.getPath('userData'), 'logs'),
     appVersion: app.getVersion(),
@@ -159,7 +163,7 @@ async function startApplication(): Promise<void> {
   void ensureMainWindow().catch(reportWindowCreationFailure);
 }
 
-void startApplication().catch(() => {
+if (!servingInstaller) void startApplication().catch(() => {
   writeLocalDiagnostic({
     level: 'error', event: 'startup.failed', correlationId: startupCorrelationId,
     err: { code: 'STARTUP_FAILED' },

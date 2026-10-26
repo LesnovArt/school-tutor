@@ -1,6 +1,6 @@
 # Development
 
-Requires Node.js 22.13 or newer and npm. Install dependencies with `npm install`, then run `npm start`. `npm run make` creates platform artifacts on the current operating system; the CI workflow builds on macOS and Windows runners.
+Requires Node.js 22.13 or newer and npm. Install dependencies with `npm install`, then run `npm start`. `npm run make` creates platform artifacts on the current operating system; the CI workflow builds on macOS and Windows runners. On Windows, `npm run make` produces a ZIP and a Squirrel installer (`out/make/squirrel.windows/<arch>/SchoolTutorSetup.exe`); run `npm run smoke:package` afterwards to check the packaged SQLite runtime. Installers are unsigned, so Windows SmartScreen will warn on first run.
 
 In development, the School Tutor window opens its own detached DevTools. The renderer is served at `/main_window/index.html`; a 404 at the bare development-server root is expected.
 

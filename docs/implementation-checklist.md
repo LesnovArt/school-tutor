@@ -18,7 +18,8 @@
 - [x] Rebuilt the macOS arm64 ZIP with the current changes after retrying the Electron artifact download with network access; the packaged SQLite smoke check passed. It validates native SQLite resolution and synthetic persistence only; it does not launch the application or exercise migrations/IPC/window behavior.
 - [x] Preload diagnostics record `error_not_observed` after page load if no preload error event was observed; the validated `renderer.ready` event records successful initialization through the bridge.
 - [ ] Interactive profile creation, language selection, and restart persistence in the extracted window remain unverified: this execution environment could not capture a desktop display (`screencapture: could not create image from display`). Keep PR 1 open until this is confirmed on a desktop session.
-- [ ] Windows native SQLite packaging remains to be confirmed by the Windows CI runner.
+- [x] Windows build support added in code: named Squirrel maker config (`SchoolTutorSetup.exe`), Squirrel install/update/uninstall launch handling in `src/main/squirrel-startup.ts` (unit-tested), and a cross-platform `smoke:package` (PE/Mach-O architecture check, `.exe`/`resources` layout) that CI now runs on Windows too.
+- [ ] Windows `npm run make`, `smoke:package`, installer install/launch/uninstall, and shortcut creation remain unverified: nothing was run on Windows. Confirm on the Windows CI runner and a real Windows machine.
 
 ## Deferred plan gaps and release checks
 

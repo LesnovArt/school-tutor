@@ -18,7 +18,19 @@ const config: ForgeConfig = {
   rebuildConfig: { force: true },
   makers: [
     { name: '@electron-forge/maker-zip', config: {}, platforms: ['darwin', 'win32'] },
-    { name: '@electron-forge/maker-squirrel', config: {}, platforms: ['win32'] },
+    {
+      name: '@electron-forge/maker-squirrel',
+      config: {
+        name: 'SchoolTutor',
+        // NuGet requires a non-empty authors value; package.json has no author.
+        authors: 'School Tutor',
+        exe: 'School Tutor.exe',
+        setupExe: 'SchoolTutorSetup.exe',
+        description: 'A local maths tutor for a family',
+        noMsi: true,
+      },
+      platforms: ['win32'],
+    },
   ],
   plugins: [
     new AutoUnpackNativesPlugin({}),

@@ -1,18 +1,24 @@
 import assert from 'node:assert/strict';
-import { access, mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, open, rm } from 'node:fs/promises';
 import path from 'node:path';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { extractFile, listPackage } from '@electron/asar';
 
+const isWindows = process.platform === 'win32';
+const isMac = process.platform === 'darwin';
+assert(isWindows || isMac, `Unsupported platform for the packaged runtime smoke check: ${process.platform}`);
+const packageDirectory = `out/School Tutor-${process.platform}-${process.arch}`;
 const appPath = path.resolve(
-  process.argv[2] ??
-    `out/School Tutor-${process.platform}-${process.arch}/School Tutor.app`,
+  process.argv[2] ?? (isMac ? `${packageDirectory}/School Tutor.app` : packageDirectory),
 );
-const resourcesPath = path.join(appPath, 'Contents', 'Resources');
+const resourcesPath = isMac ? path.join(appPath, 'Contents', 'Resources') : path.join(appPath, 'resources');
 const archivePath = path.join(resourcesPath, 'app.asar');
 const unpackedPath = `${archivePath}.unpacked`;
-const entries = new Set(await listPackage(archivePath));
+// asar builds entries with path.join, so they use backslashes on Windows.
+// asar's lookups split on path.sep, so extraction paths must use the native separator.
+const extractPackaged = async (file) => extractFile(archivePath, path.normalize(file));
+const entries = new Set((await listPackage(archivePath)).map((entry) => entry.replaceAll('\\', '/')));
 
 for (const entry of [
   '/node_modules/better-sqlite3/lib/index.js',
@@ -26,21 +32,41 @@ const nativeAddon = path.join(
   unpackedPath,
   `node_modules/better-sqlite3/prebuilds/${process.platform}-${process.arch}.node`,
 );
-await access(nativeAddon);
-const architecture = execFileSync('file', [nativeAddon], { encoding: 'utf8' });
-const fileArchitecture = process.arch === 'x64' ? 'x86_64' : process.arch;
-assert.match(architecture, new RegExp(`Mach-O 64-bit bundle ${fileArchitecture}`));
+// Mach-O CPU types and PE machine types for the architectures Electron ships.
+const MACHO_CPU = { x64: 0x01000007, arm64: 0x0100000c };
+const PE_MACHINE = { x64: 0x8664, arm64: 0xaa64 };
+async function readBinaryArchitecture(file) {
+  const handle = await open(file, 'r');
+  try {
+    const header = Buffer.alloc(4096);
+    await handle.read(header, 0, header.length, 0);
+    if (header.readUInt32LE(0) === 0xfeedfacf) return { format: 'macho', id: header.readUInt32LE(4) };
+    if (header.toString('latin1', 0, 2) === 'MZ') {
+      const peOffset = header.readUInt32LE(0x3c);
+      assert(header.toString('latin1', peOffset, peOffset + 4) === 'PE\0\0', `${file} is not a PE binary`);
+      return { format: 'pe', id: header.readUInt16LE(peOffset + 4) };
+    }
+    return { format: 'unknown', id: 0 };
+  } finally {
+    await handle.close();
+  }
+}
+const binary = await readBinaryArchitecture(nativeAddon);
+const expected = isMac ? { format: 'macho', id: MACHO_CPU[process.arch] } : { format: 'pe', id: PE_MACHINE[process.arch] };
+assert.deepEqual(binary, expected, `Native SQLite addon does not match ${process.platform}-${process.arch}`);
 
-const appManifest = JSON.parse((await extractFile(archivePath, 'package.json')).toString());
+const appManifest = JSON.parse((await extractPackaged('package.json')).toString());
 assert(appManifest.dependencies?.['better-sqlite3']);
 assert(typeof appManifest.main === 'string');
 const packagedMainEntry = path.join(resourcesPath, 'app.asar', appManifest.main);
 assert(entries.has(`/${appManifest.main}`), 'Packaged application main entry is missing');
-const rendererHtml = (await extractFile(archivePath, '.webpack/renderer/main_window/index.html')).toString();
+const rendererHtml = (await extractPackaged('.webpack/renderer/main_window/index.html')).toString();
 assert.match(rendererHtml, /connect-src 'none';/);
 assert.doesNotMatch(rendererHtml, /localhost:/);
 
-const executable = path.join(appPath, 'Contents', 'MacOS', 'School Tutor');
+const executable = isMac
+  ? path.join(appPath, 'Contents', 'MacOS', 'School Tutor')
+  : path.join(appPath, 'School Tutor.exe');
 const smokeDirectory = await mkdtemp(path.join(tmpdir(), 'school-tutor-packaged-smoke-'));
 const databasePath = path.join(smokeDirectory, 'profile-smoke.sqlite3');
 function createRuntimeEnvironment(source) {

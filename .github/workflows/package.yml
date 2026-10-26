@@ -25,8 +25,7 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run make
-      - if: runner.os == 'macOS'
-        run: npm run smoke:package
+      - run: npm run smoke:package
       - uses: actions/upload-artifact@v4
         with:
           name: app-package-${{ matrix.os }}
