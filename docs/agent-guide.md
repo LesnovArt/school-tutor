@@ -6,11 +6,13 @@ This guide is a compact orientation layer for a fresh agent run. It records the 
 
 School Tutor is a local desktop maths tutor for one family with two children, initially in grades 2 and 6 in Ukrainian and Bulgarian school systems. The intended first full release supports Ukrainian, Bulgarian, and English. A parent manages profiles, school enrollments, lessons, materials, approved resources, and spending. Children work through homework with questions, hints, simpler explanations, examples, and independent practice. The tutor should help children understand and produce their own reasoning rather than reveal a complete answer on demand.
 
-The application targets macOS and Windows. Study records and managed materials are local to an installation. External AI and resource discovery are planned, but are not part of PR 1. Child-facing data handling, provider eligibility, spending enforcement, and parental controls must be resolved before live AI use. Read the requirements and explicit exclusions in `IMPLEMENTATION_PLAN.md` before proposing product behavior.
+The application targets macOS and Windows. Study records and managed materials are local to an installation. External AI and resource discovery are planned, but are not part of PR 1 or PR 2. Child-facing data handling, provider eligibility, spending enforcement, and parental controls must be resolved before live AI use. Read the requirements and explicit exclusions in `IMPLEMENTATION_PLAN.md` before proposing product behavior.
 
 ## Delivery state and scope
 
 Work is split into sequential PRs described in `IMPLEMENTATION_PLAN.md`. PR 1 establishes the desktop shell, secure process boundary, local SQLite persistence, profile creation/selection, interface language selection, diagnostics, and packaging. It does not include AI, school enrollments, lesson management, homework, or provider credentials.
+
+PR 2 adds the parent PIN, school enrollments (grade, academic year, homework language), ordered maths lessons with a current-lesson pointer and optional cross-school related-lesson links, and the parent/child views for them. It does not include materials, homework, AI, or credentials.
 
 The user creates branches from `main`, adds commits, and pushes them. Do not commit or push. Do not start a later PR until the user approves the current PR. Check `docs/implementation-checklist.md` for current evidence and pending checks; checklist marks must reflect actual results. In particular, distinguish unit tests and synthetic packaged SQLite checks from actual packaged-app UI verification and target-platform CI.
 
@@ -21,11 +23,12 @@ The user creates branches from `main`, adds commits, and pushes them. Do not com
 | `src/main/index.ts` | Main-process composition, startup/lifecycle, single-instance behavior, shutdown, and database wiring. |
 | `src/main/window.ts` | Secure `BrowserWindow` creation, loading diagnostics, and renderer-ready handling. |
 | `src/main/ipc.ts` | Narrow IPC handlers, runtime validation, trusted-sender checks, and sanitized result envelopes. |
-| `src/main/db/` | SQLite connection, ordered migration runner (`migrations/index.ts`), profile/settings persistence. SQLite must stay in the main process. |
+| `src/main/db/` | SQLite connection, ordered migration runner (`migrations/index.ts`), profile/settings persistence, and `study.ts` (enrollments/lessons; functions take a `db` parameter). SQLite must stay in the main process. |
+| `src/main/parent-auth.ts` | Parent PIN hashing, in-memory unlock state, idle lock, and attempt throttle. `ipc.ts` uses it to gate administrative channels. |
 | `src/main/local-diagnostics.ts` | Local structured diagnostics, allowlists, IDs, rotation, and non-fatal write behavior. |
 | `src/preload/` | Small typed context bridge. Expose only explicit application operations, never generic IPC or Node capabilities. |
 | `src/contracts/` | Runtime-validated shared IPC inputs/results and types; `api.ts` holds the generic result envelope. |
-| `src/renderer/` | React profile/language UI and styling. It talks to the app only through the preload bridge. |
+| `src/renderer/` | React child home and PIN-gated parent settings, hooks, localization, and styling. It talks to the app only through the preload bridge. |
 | `forge.config.ts`, `webpack.*.config.ts` | Electron Forge, renderer/main builds, native module rebuild/staging, and packaged resources. |
 | `scripts/check-packaged-runtime.mjs` | Packaged SQLite runtime smoke check. It validates native dependency loading and synthetic cross-process persistence; it is not an application UI or migration test. |
 | `.github/workflows/package.yml` | Platform package jobs. Windows status must be reported separately from local macOS checks. |
