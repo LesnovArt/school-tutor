@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron';
 import type { Result } from 'neverthrow';
-import type { ApiError, ApiResult } from '../contracts/profile';
+import type { ApiError, ApiResult } from '../contracts/api';
 import {
   createCorrelationId,
   writeLocalDiagnostic,

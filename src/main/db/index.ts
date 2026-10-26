@@ -3,9 +3,10 @@ import { app } from 'electron';
 import path from 'node:path';
 import { err, ok, type Result } from 'neverthrow';
 import { randomUUID } from 'node:crypto';
-import { createProfileInputSchema, type ApiError, type CreateProfileInput, type Profile, profileSchema, uiLanguageSchema } from '../../contracts/profile';
+import type { ApiError } from '../../contracts/api';
+import { createProfileInputSchema, type CreateProfileInput, type Profile, profileSchema, uiLanguageSchema } from '../../contracts/profile';
 import { z } from 'zod';
-import { up as migrateProfiles } from './migrations/001-profiles';
+import { runMigrations } from './migrations';
 
 let database: Database.Database | undefined;
 
@@ -15,15 +16,7 @@ export function openDatabase(): Result<Database.Database, ApiError> {
     database = new Database(dbPath);
     database.pragma('journal_mode = WAL');
     database.pragma('foreign_keys = ON');
-    database.exec('CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY NOT NULL, applied_at TEXT NOT NULL)');
-    const applied = database.prepare('SELECT version FROM schema_migrations WHERE version = ?').get(1);
-    if (!applied) {
-      const apply = database.transaction(() => {
-        migrateProfiles(database!);
-        database!.prepare('INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)').run(1, new Date().toISOString());
-      });
-      apply();
-    }
+    runMigrations(database);
     return ok(database);
   } catch {
     return err({ code: 'PersistenceFailure', message: 'Could not open the local study database.' });

@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { CreateProfileInput, Profile, UiLanguage, ApiResult } from '../contracts/profile';
+import type { ApiResult } from '../contracts/api';
+import type { CreateProfileInput, Profile, UiLanguage } from '../contracts/profile';
 
 const api = {
   profiles: {
@@ -15,5 +16,7 @@ const api = {
   reportRendererStartupFailure: (): void => ipcRenderer.send('diagnostics:renderer-startup-failure'),
   reportRendererReady: (): void => ipcRenderer.send('diagnostics:renderer-ready'),
 };
+
+export type SchoolTutorApi = typeof api;
 
 contextBridge.exposeInMainWorld('schoolTutor', api);

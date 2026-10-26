@@ -19,7 +19,3 @@ export const createProfileInputSchema = z.object({
 export type UiLanguage = z.infer<typeof uiLanguageSchema>;
 export type Profile = z.infer<typeof profileSchema>;
 export type CreateProfileInput = z.infer<typeof createProfileInputSchema>;
-
-export type ApiErrorCode = 'InvalidInput' | 'PersistenceFailure' | 'UnauthorizedAction' | 'InternalError';
-export type ApiError = { code: ApiErrorCode; message: string };
-export type ApiResult<T> = { ok: true; value: T } | { ok: false; error: ApiError };

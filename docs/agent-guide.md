@@ -21,10 +21,10 @@ The user creates branches from `main`, adds commits, and pushes them. Do not com
 | `src/main/index.ts` | Main-process composition, startup/lifecycle, single-instance behavior, shutdown, and database wiring. |
 | `src/main/window.ts` | Secure `BrowserWindow` creation, loading diagnostics, and renderer-ready handling. |
 | `src/main/ipc.ts` | Narrow IPC handlers, runtime validation, trusted-sender checks, and sanitized result envelopes. |
-| `src/main/db/` | SQLite connection, migrations, profile/settings persistence. SQLite must stay in the main process. |
+| `src/main/db/` | SQLite connection, ordered migration runner (`migrations/index.ts`), profile/settings persistence. SQLite must stay in the main process. |
 | `src/main/local-diagnostics.ts` | Local structured diagnostics, allowlists, IDs, rotation, and non-fatal write behavior. |
 | `src/preload/` | Small typed context bridge. Expose only explicit application operations, never generic IPC or Node capabilities. |
-| `src/contracts/` | Runtime-validated shared IPC inputs/results and types. |
+| `src/contracts/` | Runtime-validated shared IPC inputs/results and types; `api.ts` holds the generic result envelope. |
 | `src/renderer/` | React profile/language UI and styling. It talks to the app only through the preload bridge. |
 | `forge.config.ts`, `webpack.*.config.ts` | Electron Forge, renderer/main builds, native module rebuild/staging, and packaged resources. |
 | `scripts/check-packaged-runtime.mjs` | Packaged SQLite runtime smoke check. It validates native dependency loading and synthetic cross-process persistence; it is not an application UI or migration test. |
@@ -33,12 +33,13 @@ The user creates branches from `main`, adds commits, and pushes them. Do not com
 | `docs/implementation-checklist.md` | Evidence-backed completed/pending PR 1 checks. |
 | `IMPLEMENTATION_PLAN.md` | Full product requirements, target architecture, PR slices, and acceptance intent. |
 
-The target architecture in the plan includes future `src/features/` and `src/infrastructure/` areas. They may not exist until their first PR consumes them. Do not create speculative layers or preemptively implement future PRs.
+The target architecture in the plan includes future `src/features/` and `src/infrastructure/` areas. They may not exist until their first PR consumes them. Migrations are an ordered list in `src/main/db/migrations/index.ts`; add new schema changes there as a new version. Do not create speculative layers or preemptively implement future PRs.
 
 ## Boundaries and safety invariants
 
 - React is presentation code. It cannot import SQLite, Node APIs, filesystem access, credentials, or unrestricted Electron APIs.
 - Preload exposes the smallest explicit API needed by renderer flows. Keep `contextIsolation: true`, `sandbox: true`, and `nodeIntegration: false`.
+- Import direction is enforced by `no-restricted-imports` rules in `eslint.config.mjs`: the renderer cannot import Electron, Node, `main`, or `preload`; contracts import only zod and other contracts; main cannot import renderer or preload.
 - Validate every IPC payload at runtime, validate the sender, and return a consistent sanitized result envelope. Do not send raw exception messages to the renderer.
 - The main process owns lifecycle and persistent resources. Ensure startup failures, normal quit, single-instance rejection, and macOS reopen paths have deliberate cleanup behavior.
 - Window callbacks must close over their owning window and check destruction before acting. Renderer readiness follows successful initialization through the bridge; a finished navigation alone is not proof that preload APIs worked.
