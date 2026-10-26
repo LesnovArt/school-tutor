@@ -4,7 +4,7 @@ import { settingsApi } from '../api/settings';
 import { resolveSelectedProfileId } from './profile-selection';
 import { reportRendererReady, reportRendererStartupFailure, isSchoolTutorBridgeAvailable } from '../diagnostics/startup-diagnostics';
 
-export type AppErrorKey = 'startupError' | 'actionError' | 'selectionError' | 'createError';
+export type AppErrorKey = 'startupError' | 'actionError' | 'selectionError' | 'createError' | 'lockedError' | 'invalidError';
 export type StartupStatus = 'loading' | 'ready' | 'failed';
 
 export function useAppStartup() {

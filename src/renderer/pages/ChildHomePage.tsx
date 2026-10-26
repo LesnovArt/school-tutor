@@ -1,42 +1,30 @@
-import type { SubmitEvent } from 'react';
 import type { Profile, UiLanguage } from '../../contracts/profile';
+import type { StudySpace } from '../../contracts/study';
 import type { AppMessages } from '../localization/messages';
-import type { AgeBand } from '../hooks/useProfileForm';
 import { AppHeader } from '../components/AppHeader';
-import { ProfileForm } from '../components/ProfileForm';
 import { ProfileList } from '../components/ProfileList';
+import { StudySpaceView } from '../components/StudySpaceView';
 
 type Props = {
   text: AppMessages;
   profiles: Profile[];
   hasProfiles: boolean;
-  canCreateProfile: boolean;
   profileSummary: string;
   selectedProfile: Profile | undefined;
   selectedId: string;
   profileMutationPending: boolean;
+  space: StudySpace | null;
   language: UiLanguage;
   languages: UiLanguage[];
   languageNames: Record<UiLanguage, string>;
   error: string;
   onLanguageChange: (language: UiLanguage) => void;
   onProfileSelect: (profileId: string) => void;
-  form: {
-    name: string;
-    setName: (value: string) => void;
-    ageBand: AgeBand;
-    setAgeBand: (value: AgeBand) => void;
-    preferredLanguage: UiLanguage;
-    setPreferredLanguage: (value: UiLanguage) => void;
-    preferences: string;
-    setPreferences: (value: string) => void;
-    saving: boolean;
-    submit: (event: SubmitEvent<HTMLFormElement>) => void;
-    ageValues: readonly AgeBand[];
-  };
+  onSelectEnrollment: (enrollmentId: string) => void;
+  onOpenParent: () => void;
 };
 
-export function ProfileSetupPage(props: Props): React.JSX.Element {
+export function ChildHomePage(props: Props): React.JSX.Element {
   return (
     <main className="page">
       <AppHeader
@@ -47,7 +35,9 @@ export function ProfileSetupPage(props: Props): React.JSX.Element {
         languages={props.languages}
         languageNames={props.languageNames}
         onLanguageChange={props.onLanguageChange}
-      />
+      >
+        <button type="button" className="ghost" onClick={props.onOpenParent}>{props.text.parentSettings}</button>
+      </AppHeader>
       <section className="card">
         <div className="section-heading">
           <span className="step">01</span>
@@ -56,31 +46,23 @@ export function ProfileSetupPage(props: Props): React.JSX.Element {
             <p>{props.profileSummary}</p>
           </div>
         </div>
-        {props.hasProfiles && <ProfileList
-          profiles={props.profiles}
-          selectedId={props.selectedId}
-          disabled={props.profileMutationPending}
-          languageNames={props.languageNames}
-          onSelect={props.onProfileSelect}
-        />}
+        {props.hasProfiles
+          ? <ProfileList
+            profiles={props.profiles}
+            selectedId={props.selectedId}
+            disabled={props.profileMutationPending}
+            languageNames={props.languageNames}
+            onSelect={props.onProfileSelect}
+          />
+          : <p className="muted">{props.text.emptyChildren}</p>}
         {props.selectedProfile && <div className="selected-note"><span className="dot" /> {props.text.selected}: <strong>{props.selectedProfile.displayName}</strong></div>}
       </section>
-      {props.canCreateProfile && <ProfileForm
+      {props.selectedProfile && <StudySpaceView
         text={props.text}
-        ageValues={props.form.ageValues}
-        name={props.form.name}
-        ageBand={props.form.ageBand}
-        preferredLanguage={props.form.preferredLanguage}
-        preferences={props.form.preferences}
-        saving={props.form.saving}
-        disabled={props.profileMutationPending}
-        languages={props.languages}
+        profile={props.selectedProfile}
+        space={props.space}
         languageNames={props.languageNames}
-        onNameChange={props.form.setName}
-        onAgeBandChange={props.form.setAgeBand}
-        onPreferredLanguageChange={props.form.setPreferredLanguage}
-        onPreferencesChange={props.form.setPreferences}
-        onSubmit={props.form.submit}
+        onSelectEnrollment={props.onSelectEnrollment}
       />}
       {props.error && <p role="alert" className="error">{props.error}</p>}
       <footer>{props.text.footer}</footer>

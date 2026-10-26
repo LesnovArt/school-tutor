@@ -1,11 +1,13 @@
 import type Database from 'better-sqlite3';
 import { up as profiles } from './001-profiles';
+import { up as study } from './002-study';
 
 type Migration = { version: number; up: (db: Database.Database) => void };
 
 // Append new migrations with the next version number; never edit or reorder applied ones.
 export const migrations: readonly Migration[] = [
   { version: 1, up: profiles },
+  { version: 2, up: study },
 ];
 
 export function runMigrations(db: Database.Database, available: readonly Migration[] = migrations): void {

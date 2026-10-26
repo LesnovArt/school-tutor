@@ -24,7 +24,7 @@ type Props = {
 export function ProfileForm(props: Props): React.JSX.Element {
   return (
     <section className="card form-card">
-      <div className="section-heading"><span className="step">02</span><div><h2>{props.text.create}</h2></div></div>
+      <div className="section-heading"><div><h2>{props.text.create}</h2></div></div>
       <form onSubmit={props.onSubmit}>
         <label>{props.text.name}<input disabled={props.disabled} autoComplete="off" maxLength={40} required value={props.name} onChange={(event) => props.onNameChange(event.target.value)} /></label>
         <div className="two-col">
