@@ -1,17 +1,18 @@
 import { useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import type { CreateProfileInput, Profile } from '../../contracts/profile';
+import type { CreateProfileInput, Profile, UiLanguage } from '../../contracts/profile';
 import { settingsApi } from '../api/settings';
 import type { AppErrorKey } from './useAppStartup';
 
-export type ProfileMutation = 'idle' | 'selecting' | 'creating';
+export type ProfileMutation = 'idle' | 'selecting' | 'creating' | 'updating';
 export type CreateProfileOutcome = 'failed' | 'created' | 'created-and-selected';
 
 export function useProfileActions(options: {
   setProfiles: Dispatch<SetStateAction<Profile[]>>;
   setSelectedId: Dispatch<SetStateAction<string>>;
   setErrorKey: Dispatch<SetStateAction<AppErrorKey | null>>;
+  onLocked: () => void;
 }) {
-  const { setProfiles, setSelectedId, setErrorKey } = options;
+  const { setProfiles, setSelectedId, setErrorKey, onLocked } = options;
   const mutationInProgress = useRef(false);
   const [pending, setPending] = useState<ProfileMutation>('idle');
 
@@ -51,7 +52,8 @@ export function useProfileActions(options: {
     try {
       const result = await window.schoolTutor.profiles.create(input);
       if (!result.ok) {
-        setErrorKey('createError');
+        if (result.error.code === 'UnauthorizedAction') onLocked();
+        setErrorKey(result.error.code === 'UnauthorizedAction' ? 'lockedError' : 'createError');
         return 'failed';
       }
       profileCreated = true;
@@ -71,5 +73,22 @@ export function useProfileActions(options: {
     }
   }
 
-  return { selectProfile, createProfile, pending };
+  async function setExplanationLanguage(profileId: string, preferredLanguage: UiLanguage): Promise<void> {
+    if (!beginMutation('updating')) return;
+    try {
+      const result = await window.schoolTutor.profiles.setExplanationLanguage({ profileId, preferredLanguage });
+      if (result.ok) {
+        setProfiles((current) => current.map((profile) => (profile.id === profileId ? result.value : profile)));
+      } else {
+        if (result.error.code === 'UnauthorizedAction') onLocked();
+        setErrorKey(result.error.code === 'UnauthorizedAction' ? 'lockedError' : 'actionError');
+      }
+    } catch {
+      setErrorKey('actionError');
+    } finally {
+      finishMutation();
+    }
+  }
+
+  return { selectProfile, createProfile, setExplanationLanguage, pending };
 }

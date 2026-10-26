@@ -1,15 +1,36 @@
+import { useState } from 'react';
 import { useLocalization } from './useLocalization';
 import { useAppStartup } from './useAppStartup';
 import { useLanguageSettings } from './useLanguageSettings';
 import { useProfileActions } from './useProfileActions';
 import { useProfileForm } from './useProfileForm';
+import { useParentAccess } from './useParentAccess';
+import { useParentConsole } from './useParentConsole';
+import { useStudySpace } from './useStudySpace';
+
+export type AppView = 'child' | 'parent';
 
 export function useTutorApp() {
   const startup = useAppStartup();
   const localization = useLocalization(startup.language);
+  const [view, setView] = useState<AppView>('child');
+  const parentAccess = useParentAccess(startup.setErrorKey);
   const profileActions = useProfileActions({
     setProfiles: startup.setProfiles,
     setSelectedId: startup.setSelectedId,
+    setErrorKey: startup.setErrorKey,
+    onLocked: parentAccess.markLocked,
+  });
+  const studySpace = useStudySpace({
+    ready: startup.status === 'ready',
+    selectedId: startup.selectedId,
+    active: view === 'child',
+    setErrorKey: startup.setErrorKey,
+  });
+  const parentConsole = useParentConsole({
+    profiles: startup.profiles,
+    active: view === 'parent' && parentAccess.status?.unlocked === true,
+    onLocked: parentAccess.markLocked,
     setErrorKey: startup.setErrorKey,
   });
   const languageSettings = useLanguageSettings({
@@ -25,6 +46,13 @@ export function useTutorApp() {
     ...profileActions,
     ...languageSettings,
     profileForm,
+    view,
+    openParent: () => { startup.setErrorKey(null); void parentAccess.refresh(); setView('parent'); },
+    closeParent: () => { startup.setErrorKey(null); setView('child'); },
+    parentAccess,
+    parentConsole,
+    studySpace: studySpace.space,
+    selectEnrollment: studySpace.selectEnrollment,
     profileMutationPending: profileActions.pending !== 'idle',
     selectedProfile,
     hasProfiles: startup.profiles.length > 0,
