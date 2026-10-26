@@ -6,6 +6,7 @@ import {
   writeLocalDiagnostic,
 } from './local-diagnostics';
 import { createParentAuth } from './parent-auth';
+import * as study from './db/study';
 import {
   getMainWindow,
   recordRendererReady,
@@ -52,6 +53,8 @@ export function registerIpc(database: DatabaseApi): void {
   const parent = createParentAuth({ getDatabase: () => database.getDatabase() });
   // Administrative mutations are authorized here, in the main process; the renderer cannot skip the check.
   const registerParent = <T>(channel: string, operation: (input: unknown) => T) => register(channel, operation, parent.authorize);
+  const db = () => database.getDatabase();
+  const activeProfileId = () => database.getActiveProfileId();
 
   register('parent:status', () => toApiResult(parent.getStatus()));
   register('parent:setup-pin', (input) => toApiResult(parent.setupPin(input)));
@@ -61,6 +64,18 @@ export function registerIpc(database: DatabaseApi): void {
   register('profiles:list', () => toApiResult(database.listProfiles()));
   registerParent('profiles:create', (input) => toApiResult(database.createProfile(input)));
   registerParent('profiles:set-explanation-language', (input) => toApiResult(database.setExplanationLanguage(input)));
+
+  // Child-facing study access never takes a profile ID; main resolves the active profile itself.
+  register('study:get-space', () => toApiResult(activeProfileId().andThen((id) => study.getActiveSpace(db(), id))));
+  register('study:select-enrollment', (input) => toApiResult(activeProfileId().andThen((id) => study.selectEnrollment(db(), id, input))));
+  registerParent('study:get-parent-space', (input) => toApiResult(study.getParentSpace(db(), input)));
+  registerParent('study:create-enrollment', (input) => toApiResult(study.createEnrollment(db(), input)));
+  registerParent('study:update-enrollment', (input) => toApiResult(study.updateEnrollment(db(), input)));
+  registerParent('study:create-lesson', (input) => toApiResult(study.createLesson(db(), input)));
+  registerParent('study:update-lesson', (input) => toApiResult(study.updateLesson(db(), input)));
+  registerParent('study:move-lesson', (input) => toApiResult(study.moveLesson(db(), input)));
+  registerParent('study:set-current-lesson', (input) => toApiResult(study.setCurrentLesson(db(), input)));
+  registerParent('study:delete-lesson', (input) => toApiResult(study.deleteLesson(db(), input)));
 
   register('settings:get-language', () => toApiResult(database.getUiLanguage()));
   register('settings:get-active-profile', () => toApiResult(database.getActiveProfileId()));

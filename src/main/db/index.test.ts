@@ -7,9 +7,10 @@ const { mockGetPath } = vi.hoisted(() => ({ mockGetPath: vi.fn() }));
 vi.mock('electron', () => ({ app: { getPath: mockGetPath } }));
 
 import {
-  closeDatabase, createProfile, getActiveProfileId, listProfiles, openDatabase, setActiveProfileId,
+  closeDatabase, createProfile, getActiveProfileId, getDatabase, listProfiles, openDatabase, setActiveProfileId,
   setExplanationLanguage, setUiLanguage,
 } from './index';
+import { createEnrollment, getActiveSpace, selectEnrollment } from './study';
 
 let dataPath = '';
 
@@ -51,6 +52,26 @@ describe('local profile persistence', () => {
 
 describe('language roles', () => {
   const mila = { displayName: 'Mila', ageBand: '6-8', preferredLanguage: 'uk', learningPreferences: '' };
+
+  it('changes the interface language without losing the selected school or its persisted choice', () => {
+    expect(openDatabase().isOk()).toBe(true);
+    const profile = createProfile(mila)._unsafeUnwrap();
+    setActiveProfileId(profile.id)._unsafeUnwrap();
+    const enroll = (schoolSystem: 'ua' | 'bg') => createEnrollment(getDatabase(), {
+      profileId: profile.id, schoolSystem, academicYear: '2026-2027', grade: 2, homeworkLanguage: schoolSystem === 'ua' ? 'uk' : 'bg',
+    })._unsafeUnwrap();
+    enroll('ua');
+    const bg = enroll('bg').enrollments.find((enrollment) => enrollment.schoolSystem === 'bg')!;
+    selectEnrollment(getDatabase(), profile.id, { enrollmentId: bg.id })._unsafeUnwrap();
+
+    for (const language of ['en', 'bg', 'uk'] as const) {
+      expect(setUiLanguage(language).isOk()).toBe(true);
+      expect(getActiveSpace(getDatabase(), profile.id)._unsafeUnwrap()!.selectedEnrollmentId).toBe(bg.id);
+    }
+    closeDatabase();
+    expect(openDatabase().isOk()).toBe(true);
+    expect(getActiveSpace(getDatabase(), profile.id)._unsafeUnwrap()!.selectedEnrollmentId).toBe(bg.id);
+  });
 
   it('sets the explanation language per child, independent of interface and homework languages', () => {
     expect(openDatabase().isOk()).toBe(true);
